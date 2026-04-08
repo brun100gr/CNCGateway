@@ -25,6 +25,6 @@ make
 ### Start grblHAL_sim
 This is a CNC simulator able to receive gcode from bCNC
 ```
-socat /tmp/ttyV1,raw,echo=0 \
+socat /tmp/ttyV3,raw,echo=0 \
 EXEC:'./Simulator/build/grblHAL_sim -n',pty,raw,echo=0
 ```

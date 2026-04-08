@@ -1,54 +1,58 @@
+import serial
 import socket
+import threading
+
+SERIAL_PORT = "/tmp/ttyV2"
+BAUDRATE = 115200
+
+TCP_PORT = 5000
 
 # =========================
-# Configurazione
+# Setup
 # =========================
-LISTEN_IP = "0.0.0.0"
-LISTEN_PORT = 5000
+ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0)
 
-ACK_BYTE = b'\x06'
-
-# =========================
-# Utility stampa
-# =========================
-def format_data(data):
-    hex_part = " ".join(f"{b:02X}" for b in data)
-    ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in data)
-    return hex_part, ascii_part
-
-# =========================
-# Server TCP
-# =========================
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.bind((LISTEN_IP, LISTEN_PORT))
+sock.bind(("0.0.0.0", TCP_PORT))
 sock.listen(1)
 
-print(f"Server in ascolto su {LISTEN_IP}:{LISTEN_PORT}")
-
+print(f"Server in ascolto su {TCP_PORT}")
 conn, addr = sock.accept()
-print(f"Connessione da {addr}")
+print(f"Client connesso: {addr}")
+
+# =========================
+# TCP → SERIAL
+# =========================
+def tcp_to_serial():
+    while True:
+        data = conn.recv(1024)
+        if not data:
+            break
+        ser.write(data)
+
+# =========================
+# SERIAL → TCP
+# =========================
+def serial_to_tcp():
+    while True:
+        data = ser.read(1024)
+        if data:
+            conn.sendall(data)
+
+# =========================
+# Threads
+# =========================
+t1 = threading.Thread(target=tcp_to_serial, daemon=True)
+t2 = threading.Thread(target=serial_to_tcp, daemon=True)
+
+t1.start()
+t2.start()
 
 try:
     while True:
-        data = conn.recv(1024)
-
-        if not data:
-            print("Connessione chiusa dal client")
-            break
-
-        hex_part, ascii_part = format_data(data)
-
-        print("\n--- PACCHETTO RICEVUTO ---")
-        print(f"Lunghezza: {len(data)} byte")
-        print(f"HEX   : {hex_part}")
-        print(f"ASCII : {ascii_part}")
-
-        # Invio ACK
-        conn.sendall(ACK_BYTE)
-
+        pass
 except KeyboardInterrupt:
-    print("\nChiusura server")
-
-finally:
+    print("Chiusura server")
     conn.close()
     sock.close()
+    ser.close()
