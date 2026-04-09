@@ -1,6 +1,7 @@
 import serial
 import socket
 import threading
+import time
 
 SERIAL_PORT = "/tmp/ttyV2"
 BAUDRATE = 115200
@@ -8,10 +9,20 @@ BAUDRATE = 115200
 TCP_PORT = 5000
 
 # =========================
-# Setup
+# Setup seriale (con retry)
 # =========================
-ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0)
+while True:
+    try:
+        ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0)
+        print(f"Seriale aperta: {SERIAL_PORT}")
+        break
+    except serial.SerialException:
+        print(f"Seriale non disponibile ({SERIAL_PORT}), retry tra 1s...")
+        time.sleep(1)
 
+# =========================
+# Setup TCP
+# =========================
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind(("0.0.0.0", TCP_PORT))
 sock.listen(1)
@@ -25,19 +36,27 @@ print(f"Client connesso: {addr}")
 # =========================
 def tcp_to_serial():
     while True:
-        data = conn.recv(1024)
-        if not data:
+        try:
+            data = conn.recv(1024)
+            if not data:
+                break
+            ser.write(data)
+        except Exception as e:
+            print(f"Errore TCP→SERIAL: {e}")
             break
-        ser.write(data)
 
 # =========================
 # SERIAL → TCP
 # =========================
 def serial_to_tcp():
     while True:
-        data = ser.read(1024)
-        if data:
-            conn.sendall(data)
+        try:
+            data = ser.read(1024)
+            if data:
+                conn.sendall(data)
+        except Exception as e:
+            print(f"Errore SERIAL→TCP: {e}")
+            break
 
 # =========================
 # Threads
@@ -50,7 +69,7 @@ t2.start()
 
 try:
     while True:
-        pass
+        time.sleep(1)
 except KeyboardInterrupt:
     print("Chiusura server")
     conn.close()

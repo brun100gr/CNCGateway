@@ -1,2 +1,7 @@
 #!/bin/bash
-echo "Script 3"
+
+echo "Start serial to TCP gateway"
+
+source venv/bin/activate
+
+python serial_to_tcp.py

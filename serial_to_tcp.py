@@ -10,11 +10,22 @@ TCP_IP = "127.0.0.1"
 TCP_PORT = 5000
 
 # =========================
-# Setup
+# Setup seriale (con retry)
 # =========================
-ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0)
+while True:
+    try:
+        ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0)
+        print(f"Seriale aperta: {SERIAL_PORT}")
+        break
+    except serial.SerialException:
+        print(f"Seriale non disponibile ({SERIAL_PORT}), retry tra 1s...")
+        time.sleep(1)
 
+# =========================
+# Setup TCP (con retry)
+# =========================
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
 while True:
     try:
@@ -32,19 +43,28 @@ print("Gateway connesso")
 # =========================
 def serial_to_tcp():
     while True:
-        data = ser.read(1024)
-        if data:
-            sock.sendall(data)
+        try:
+            data = ser.read(1024)
+            if data:
+                sock.sendall(data)
+        except Exception as e:
+            print(f"Errore SERIAL→TCP: {e}")
+            break
 
 # =========================
 # TCP → SERIAL
 # =========================
 def tcp_to_serial():
     while True:
-        data = sock.recv(1024)
-        if not data:
+        try:
+            data = sock.recv(1024)
+            if not data:
+                print("Connessione chiusa dal server")
+                break
+            ser.write(data)
+        except Exception as e:
+            print(f"Errore TCP→SERIAL: {e}")
             break
-        ser.write(data)
 
 # =========================
 # Threads
@@ -55,9 +75,12 @@ t2 = threading.Thread(target=tcp_to_serial, daemon=True)
 t1.start()
 t2.start()
 
+# =========================
+# Main loop
+# =========================
 try:
     while True:
-        pass
+        time.sleep(1)
 except KeyboardInterrupt:
     print("Chiusura gateway")
     sock.close()
