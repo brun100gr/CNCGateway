@@ -9,6 +9,11 @@ BAUDRATE = 115200
 TCP_IP = "127.0.0.1"
 TCP_PORT = 5000
 
+def log(direction, data):
+    # testo (byte non stampabili diventano '.')
+    text_data = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in data)
+    print(f"[{time.strftime('%H:%M:%S')}] {direction} | HEX: {hex_data} | TXT: {text_data}")
+
 # =========================
 # Setup seriale (con retry)
 # =========================
@@ -46,6 +51,7 @@ def serial_to_tcp():
         try:
             data = ser.read(1024)
             if data:
+                log("SER→TCP", data)
                 sock.sendall(data)
         except Exception as e:
             print(f"Errore SERIAL→TCP: {e}")
@@ -61,6 +67,7 @@ def tcp_to_serial():
             if not data:
                 print("Connessione chiusa dal server")
                 break
+            log("TCP→SER", data)
             ser.write(data)
         except Exception as e:
             print(f"Errore TCP→SERIAL: {e}")
