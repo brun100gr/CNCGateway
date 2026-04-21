@@ -1,5 +1,4 @@
 #include <WiFi.h>
-#include <PubSubClient.h>
 
 #if __has_include("secrets.h")
   #include "secrets.h"
@@ -8,65 +7,78 @@
 #endif
 
 // =========================
-// Configurazione
+// Configuration
 // =========================
 #define TCP_PORT 5000
 
-// UART CNC (modifica se serve)
+// CNC UART
 #define CNC_RX 16
 #define CNC_TX 17
 #define CNC_BAUD 115200
 
-// MQTT
-#define MQTT_BROKER "192.168.1.100"
-#define MQTT_PORT   1883
-#define MQTT_TOPIC  "esp32/cnc/log"
+// =========================
+// MQTT ENABLE
+// =========================
+#define ENABLE_MQTT 0   // <-- set to 0 to completely disable
+
+#if ENABLE_MQTT
+  #include <PubSubClient.h>
+
+  #define MQTT_BROKER "192.168.1.23"
+  #define MQTT_PORT   1883
+  #define MQTT_TOPIC  "esp32/cnc/log"
+
+  WiFiClient espClient;
+  PubSubClient mqtt(espClient);
+#endif
 
 // =========================
-// Oggetti
+// Objects
 // =========================
 WiFiServer server(TCP_PORT);
 WiFiClient tcpClient;
 
-WiFiClient espClient;
-PubSubClient mqtt(espClient);
-
 // =========================
-// Funzioni utili
+// Utility functions
 // =========================
-void logMQTT(const String &msg) {
+void logMsg(const String &msg) {
   Serial.println(msg);
+
+#if ENABLE_MQTT
   if (mqtt.connected()) {
     mqtt.publish(MQTT_TOPIC, msg.c_str());
   }
+#endif
 }
 
 void connectWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connessione WiFi");
+  Serial.print("Connecting to WiFi");
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
 
-  Serial.printf("\nWiFi connesso: %s\n", WiFi.localIP().toString().c_str());
+  Serial.printf("\nWiFi connected: %s\n", WiFi.localIP().toString().c_str());
 }
 
+#if ENABLE_MQTT
 void connectMQTT() {
   while (!mqtt.connected()) {
-    Serial.print("Connessione MQTT...");
+    Serial.print("Connecting to MQTT...");
     if (mqtt.connect("ESP32-CNC")) {
-      Serial.println("connesso");
-      logMQTT("MQTT connesso");
+      Serial.println("connected");
+      logMsg("MQTT connected");
     } else {
-      Serial.print("errore, rc=");
+      Serial.print("error, rc=");
       Serial.print(mqtt.state());
       Serial.println(" retry...");
       delay(2000);
     }
   }
 }
+#endif
 
 // =========================
 // Setup
@@ -77,27 +89,34 @@ void setup() {
 
   connectWiFi();
 
+#if ENABLE_MQTT
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
+#endif
 
   server.begin();
-  logMQTT("Server TCP avviato");
+  logMsg("TCP server started");
 }
 
 // =========================
 // Loop
 // =========================
 void loop() {
-  // Mantieni MQTT connesso
+
+#if ENABLE_MQTT
+  // Keep MQTT connected
   if (!mqtt.connected()) {
     connectMQTT();
   }
   mqtt.loop();
+#endif
 
-  // Gestione client TCP
+  // =========================
+  // TCP client handling
+  // =========================
   if (!tcpClient || !tcpClient.connected()) {
     tcpClient = server.accept();
     if (tcpClient) {
-      logMQTT("Client TCP connesso");
+      logMsg("TCP client connected");
     }
   }
 
