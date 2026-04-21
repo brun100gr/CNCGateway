@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 #if __has_include("secrets.h")
   #include "secrets.h"
@@ -88,6 +89,9 @@ void setup() {
   Serial2.begin(CNC_BAUD, SERIAL_8N1, CNC_RX, CNC_TX);
 
   connectWiFi();
+
+  MDNS.begin("esp32");  // => esp32.local
+  Serial.println("mDNS: esp32.local");
 
 #if ENABLE_MQTT
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
